@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TXT Guess Who? 猜猜成員是誰！</title>
+  <!-- 引入輕量級紙花特效庫 -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <!-- Google 可愛字體 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --sky-blue: #60a5fa;
+      --sky-light: #eff6ff;
+      --sky-dark: #2563eb;
+      --white: #ffffff;
+      --correct-green: #34d399;
+      --wrong-red: #f87171;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Fredoka', 'Noto Sans TC', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 50%, #93c5fd 100%);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 16px;
+      color: var(--text-main);
+    }
+
+    .container {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(8px);
+      width: 100%;
+      max-width: 440px;
+      border-radius: 28px;
+      padding: 24px;
+      box-shadow: 0 20px 35px -10px rgba(59, 130, 246, 0.25),
+                  0 8px 16px -6px rgba(0, 0, 0, 0.05);
+      border: 3px solid rgba(255, 255, 255, 0.9);
+      text-align: center;
+      position: relative;
+    }
+
+    header h1 {
+      font-size: 1.55rem;
+      font-weight: 700;
+      color: var(--sky-dark);
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .header-sub {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* 頂部進度條 */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #60a5fa, #3b82f6);
+      border-radius: 999px;
+      transition: width 0.3s ease;
+    }
+
+    .quiz-status {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--sky-dark);
+      margin-bottom: 12px;
+      padding: 0 4px;
+    }
+
+    /* 圖片展示區 */
+    .image-wrapper {
+      width: 100%;
+      height: 290px;
+      background-color: #f1f5f9;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px dashed #cbd5e1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 18px;
+      position: relative;
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.03);
+    }
+
+    .image-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: opacity 0.2s ease;
+    }
+
+    /* 成員選項按鈕 */
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .btn-option {
+      background: #ffffff;
+      border: 2px solid #e2e8f0;
+      color: var(--text-main);
+      padding: 12px 16px;
+      border-radius: 16px;
+      font-size: 1.05rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 3px 6px rgba(0, 0, 0, 0.03);
+    }
+
+    .btn-option:hover:not(:disabled) {
+      border-color: var(--sky-blue);
+      background-color: var(--sky-light);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 12px rgba(96, 165, 250, 0.15);
+    }
+
+    .btn-option:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    /* 答對樣式（綠色） */
+    .btn-option.correct {
+      background-color: var(--correct-green) !important;
+      border-color: #059669 !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 16px rgba(52, 211, 153, 0.5) !important;
+      transform: scale(1.02);
+    }
+
+    /* 答錯樣式（紅色 + 震動動畫） */
+    .btn-option.wrong {
+      background-color: var(--wrong-red) !important;
+      border-color: #dc2626 !important;
+      color: #ffffff !important;
+      animation: shake 0.4s ease-in-out;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-8px); }
+      40% { transform: translateX(8px); }
+      60% { transform: translateX(-6px); }
+      80% { transform: translateX(6px); }
+    }
+
+    /* 結算頁面 */
+    .result-container {
+      display: none;
+      padding: 20px 8px 12px;
+    }
+
+    .result-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--sky-dark);
+      margin-bottom: 8px;
+    }
+
+    .score-circle {
+      width: 130px;
+      height: 130px;
+      margin: 18px auto;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      color: white;
+      box-shadow: 0 10px 20px rgba(37, 99, 235, 0.25);
+    }
+
+    .score-number {
+      font-size: 2.6rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .score-total {
+      font-size: 0.95rem;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    .result-message {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .btn-restart {
+      width: 100%;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: #ffffff;
+      padding: 14px;
+      border: none;
+      border-radius: 18px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(37, 99, 235, 0.3);
+      transition: all 0.2s;
+    }
+
+    .btn-restart:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.4);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- 問答進行畫面 -->
+    <div id="quiz-view">
+      <header>
+        <h1>TXT 猜猜看 ✨</h1>
+        <p class="header-sub">看著照片，選出他是哪位成員吧！</p>
+      </header>
+
+      <div class="progress-bar-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+
+      <div class="quiz-status">
+        <span id="question-counter">第 1 / 5 題</span>
+        <span id="score-counter">目前答對: 0</span>
+      </div>
+
+      <div class="image-wrapper">
+        <img id="quiz-image" src="" alt="TXT Member Photo" />
+      </div>
+
+      <div class="options-grid" id="options-container">
+        <!-- 選項會透過 JavaScript 自動生成 -->
+      </div>
+    </div>
+
+    <!-- 測驗結算畫面 -->
+    <div id="result-view" class="result-container">
+      <h2 class="result-title">測驗完成 🎉</h2>
+      <div class="score-circle">
+        <div class="score-number" id="final-score">0</div>
+        <div class="score-total">/ 5 題</div>
+      </div>
+      <p class="result-message" id="result-comment">表現得真棒！</p>
+      <button class="btn-restart" onclick="restartQuiz()">再玩一次 ↺</button>
+    </div>
+  </div>
+
+  <script>
+    // 1. 五位成員清單（加入 matchKeys 方便檔名比對，支援 kai 縮寫）
+    const MEMBERS = [
+      { id: 'soobin', name: 'Soobin', matchKeys: ['soobin'] },
+      { id: 'yeonjun', name: 'Yeonjun', matchKeys: ['yeonjun'] },
+      { id: 'beomgyu', name: 'Beomgyu', matchKeys: ['beomgyu'] },
+      { id: 'taehyun', name: 'Taehyun', matchKeys: ['taehyun'] },
+      { id: 'hueningkai', name: 'Huening Kai', matchKeys: ['kai', 'hueningkai'] }
+    ];
+
+    // 2. 圖片路徑資料庫（依照新檔名格式配置於 page/ 資料夾）
+    const IMAGE_GALLERY = [
+      "page/page_soobin_01.jpg",
+      "page/page_soobin_02.jpg",
+      "page/page_yeonjun_01.jpg",
+      "page/page_yeonjun_02.jpg",
+      "page/page_beomgyu_01.jpg",
+      "page/page_beomgyu_02.jpg",
+      "page/page_taehyun_01.jpg",
+      "page/page_taehyun_02.jpg",
+      "page/page_kai_01.jpg",
+      "page/page_kai_02.jpg"
+    ];
+
+    // 測驗設定與狀態變數
+    const TOTAL_QUESTIONS = 5;
+    const MAX_PER_MEMBER = 2; // 每位成員最多出現 2 題
+    let quizDeck = [];
+    let currentIndex = 0;
+    let score = 0;
+    let isAnsweringLocked = false;
+
+    // DOM 元素
+    const quizView = document.getElementById('quiz-view');
+    const resultView = document.getElementById('result-view');
+    const quizImage = document.getElementById('quiz-image');
+    const optionsContainer = document.getElementById('options-container');
+    const questionCounter = document.getElementById('question-counter');
+    const scoreCounter = document.getElementById('score-counter');
+    const progressBar = document.getElementById('progress-bar');
+    const finalScore = document.getElementById('final-score');
+    const resultComment = document.getElementById('result-comment');
+
+    // 根據路徑判斷成員
+    function getMemberFromPath(path) {
+      const lower = path.toLowerCase();
+      return MEMBERS.find(m => m.matchKeys.some(key => lower.includes(key))) || MEMBERS[0];
+    }
+
+    // 抽題演算法：隨機抽取 5 題，且同一成員最多出現 2 次
+    function generateQuizDeck() {
+      const shuffled = [...IMAGE_GALLERY].sort(() => 0.5 - Math.random());
+      const selected = [];
+      const memberCount = {};
+
+      for (const img of shuffled) {
+        if (selected.length >= TOTAL_QUESTIONS) break;
+        const member = getMemberFromPath(img);
+        const count = memberCount[member.id] || 0;
+
+        if (count < MAX_PER_MEMBER) {
+          selected.push(img);
+          memberCount[member.id] = count + 1;
+        }
+      }
+
+      // 如果圖庫較少導致不足 5 題，直接補足
+      if (selected.length < TOTAL_QUESTIONS && shuffled.length >= TOTAL_QUESTIONS) {
+        return shuffled.slice(0, TOTAL_QUESTIONS);
+      }
+      return selected;
+    }
+
+    // 啟動測驗
+    function initQuiz() {
+      quizDeck = generateQuizDeck();
+      currentIndex = 0;
+      score = 0;
+      isAnsweringLocked = false;
+
+      quizView.style.display = 'block';
+      resultView.style.display = 'none';
+
+      renderQuestion();
+    }
+
+    // 渲染題目
+    function renderQuestion() {
+      if (currentIndex >= quizDeck.length) {
+        showResults();
+        return;
+      }
+
+      const currentImagePath = quizDeck[currentIndex];
+      isAnsweringLocked = false;
+
+      // 更新進度與計分（改為 / 5 題）
+      questionCounter.innerText = `第 ${currentIndex + 1} / ${quizDeck.length} 題`;
+      scoreCounter.innerText = `目前答對: ${score}`;
+      progressBar.style.width = `${((currentIndex) / quizDeck.length) * 100}%`;
+
+      // 載入圖片
+      quizImage.src = currentImagePath;
+      quizImage.onerror = () => {
+        quizImage.alt = `找不到圖片：${currentImagePath}，請確認檔案位置`;
+      };
+
+      // 計算正解
+      const correctMember = getMemberFromPath(currentImagePath);
+
+      // 生成 5 個選項按鈕
+      optionsContainer.innerHTML = '';
+      MEMBERS.forEach(member => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-option';
+        btn.innerText = member.name;
+        btn.onclick = () => handleChoice(btn, member.id, correctMember.id);
+        optionsContainer.appendChild(btn);
+      });
+    }
+
+    // 處理點選答案
+    function handleChoice(selectedBtn, chosenId, correctId) {
+      if (isAnsweringLocked) return;
+      isAnsweringLocked = true;
+
+      const buttons = optionsContainer.querySelectorAll('.btn-option');
+      buttons.forEach(b => b.disabled = true); // 鎖定按鈕避免連點
+
+      const isCorrect = (chosenId === correctId);
+
+      if (isCorrect) {
+        // 答對：綠燈 + 噴灑紙花
+        selectedBtn.classList.add('correct');
+        score++;
+        scoreCounter.innerText = `目前答對: ${score}`;
+        fireConfetti();
+      } else {
+        // 答錯：紅燈震動 + 正確答案亮綠燈
+        selectedBtn.classList.add('wrong');
+        buttons.forEach(btn => {
+          const matchMember = MEMBERS.find(m => m.name === btn.innerText);
+          if (matchMember && matchMember.id === correctId) {
+            btn.classList.add('correct');
+          }
+        });
+      }
+
+      // 等待 1 秒後切換至下一題
+      setTimeout(() => {
+        currentIndex++;
+        renderQuestion();
+      }, 1000);
+    }
+
+    // 答對紙花
+    function fireConfetti() {
+      confetti({
+        particleCount: 50,
+        spread: 70,
+        origin: { y: 0.65 },
+        colors: ['#60a5fa', '#34d399', '#f472b6', '#facc15']
+      });
+    }
+
+    // 結算畫面
+    function showResults() {
+      quizView.style.display = 'none';
+      resultView.style.display = 'block';
+      progressBar.style.width = '100%';
+
+      finalScore.innerText = score;
+
+      // 5 題制的專屬評語
+      if (score === 5) {
+        resultComment.innerText = "太強了！全對 5/5 滿分！🎉\n你絕對是眼力 100 分的真 MOA！💙";
+        confetti({ particleCount: 120, spread: 100, origin: { y: 0.6 } });
+      } else if (score >= 3) {
+        resultComment.innerText = "很厲害唷！答對了大部分！\n再玩一次挑戰 5 題全對吧 ✨";
+      } else {
+        resultComment.innerText = "再多看幾次照片熟悉一下吧～\n按下方按鈕再挑戰一次！🐰🦊🧸🐿️🐧";
+      }
+    }
+
+    // 重新開始
+    function restartQuiz() {
+      initQuiz();
+    }
+
+    window.onload = initQuiz;
+  </script>
+</body>
+</html>
